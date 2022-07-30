@@ -1,0 +1,203 @@
+document.addEventListener('DOMContentLoaded', function () {
+  req = new XMLHttpRequest();
+  req.open("GET", 'https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/global-temperature.json', true);
+  req.send();
+  req.onload = function () {
+    json = JSON.parse(req.responseText);
+    var dataset = json;
+    //  console.log(dataset);
+
+    var margin = { top: 10, right: 30, bottom: 30, left: 60 },
+    width = 960 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+    var svg = d3.select("a").
+    append("svg").
+    attr("width", width + margin.left + margin.right).
+    attr("height", height + margin.top + margin.bottom + 200).
+    append("g").
+    attr("transform",
+    "translate(" + margin.left + "," + margin.top + ")");
+
+    // Labels of row and columns
+    var myGroups = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+    var anni = [];
+    //console.log(dataset);
+    for (var i = 0; i < dataset.monthlyVariance.length; i++) {
+      anni.push(dataset.monthlyVariance[i].year);
+
+    }
+
+    var mesi = [];
+    //console.log(dataset);
+    for (var i = 0; i < dataset.monthlyVariance.length; i++) {
+      mesi.push(dataset.monthlyVariance[i].month - 1);
+
+    }
+    var varianze = [];
+    //console.log(dataset.monthlyVariance);
+    for (var i = 0; i < dataset.monthlyVariance.length; i++) {
+      //console.log(dataset.monthlyVariance[i]);
+      varianze.push(dataset.monthlyVariance[i].variance);
+
+    }
+
+
+    var temperature = [];
+    for (var i = 0; i < dataset.monthlyVariance.length; i++) {
+      temperature.push(dataset.baseTemperature + dataset.monthlyVariance[i].variance);
+
+    };
+    // Build X scales and axis:
+    var x = d3.scaleLinear().
+    range([0, width]).
+    domain([d3.min(anni), d3.max(anni)]);
+    // .padding(0.01);
+
+    x.ticks();
+
+    svg.append("g").
+    attr("transform", "translate(0," + height + ")").
+    attr("id", "x-axis").
+    call(d3.axisBottom(x).ticks(20).tickFormat(d3.format("d")));
+
+    // console.log(x.domain());
+    // Build X scales and axis:
+    var y = d3.scaleBand().
+    domain(mesi).
+    rangeRound([0, height]).
+    padding(0);
+
+    ;
+    // console.log("****" + y.domain())
+    svg.append("g").
+    attr("id", "y-axis").
+    call(d3.axisLeft(y).
+    tickValues(y.domain()).
+    tickFormat(function (month) {
+      var date = new Date(0);
+      date.setUTCMonth(month);
+      var format = d3.timeFormat('%B');
+      return format(date);
+    }).
+    tickSize(10, 1));
+    // Build color scale
+    //["6184d8","50c5b7","f0f465","fa9f42","721817"]
+    var myColor = d3.scaleLinear().
+    range(["#6184d8", "#f0f465", "#fa9f42", "#721817"]).
+    domain([d3.min(temperature), 7, 9, d3.max(temperature)]);
+
+    //Read the data
+
+    console.log(y.bandwidth());
+    svg.append("g").selectAll("rect").
+    data(dataset.monthlyVariance).
+    enter().
+    append("rect").
+    attr("class", "cell").
+    attr("x", function (d) {return x(d.year);}).
+    attr("y", function (d) {return y(d.month - 1);}).
+    attr("data-month", d => {//console.log(d.month)
+      return d.month - 1;}).
+    attr("data-year", d => d.year).
+    attr("data-temp", d => dataset.baseTemperature + d.variance).
+    attr("width", 10).
+    attr("height", y.bandwidth()).
+    style("fill", function (d) {return myColor(dataset.baseTemperature + d.variance);});
+
+    //tooltip
+
+    var tooltip = d3.select(".graph").
+    append("div").
+    style("position", "absolute").
+    style("visibility", "hidden").
+    attr("id", "tooltip");
+
+
+
+    d3.selectAll("rect").
+    on("mouseover", (d, idx) => {
+      // console.log(idx);
+      tooltip.style("visibility", "visible");
+      tooltip.html("Date: " + idx.year + "-" + idx.month + " <br> " + "t " + (dataset.baseTemperature + idx.variance));
+      tooltip.attr("data-year", idx.year).
+      style("top", event.pageY - 2 + "px").
+      style("left", event.pageX + 2 + "px").
+      style("opacity", 0.9).
+
+      style("transform", "translateX(60px)");
+    }).on('mouseout', (d, idx) => {
+      // console.log(idx);
+      tooltip.style("visibility", "hidden");});
+    //legend
+    console.log(myColor.range());
+
+    const legend = svg.append("g").
+    classed('legend', true).
+    attr('id', 'legend').
+    attr("transform", (d, i) => "translate( 0," + i * 20 + ")");
+
+    legend.
+    append('g').
+    selectAll('rect').
+    data(myColor.range()).
+    enter().
+    append("rect")
+    //    .attr("id", "legend")
+    .attr("x", (d, i) => i * 50).
+    attr("y", height + 100).
+    attr("width", 15).
+    attr("height", 15).
+    attr("fill", d => d).
+    attr("varianze", d => d.variance);
+
+    legend.
+    append('g').
+    selectAll('rect').
+    data(myColor.range()).
+    enter().
+    append("text")
+    //    .attr("id", "legend")
+    .attr("x", (d, i) => i * 50).
+    attr("y", height + 100).
+    attr("font-size", "65%").
+    attr("font-family", "arial").
+    text((d, idx) => {
+      if (idx == 0) {
+        return "< 7";
+      }
+      if (idx == 1) {
+        return " 7 < t < 9";
+      }
+      if (idx == 2) {
+        return "9 < t < 11";
+      }
+      if (idx == 3) {
+        return "t>11";
+      }
+    });
+
+    /*  var legendX = d3
+        .scaleLinear()
+        .domain([d3.min(temperature), d3.max(temperature)])
+        .range([0, 300]);
+    
+      var legendXAxis = d3
+        .axisBottom()
+        .scale(legendX)
+        .tickSize(10, 0)
+        //.tickValues(legendThreshold.domain())
+        .tickFormat(d3.format('.1f'));
+    
+          legend
+        .append('g')
+        .attr('transform', 'translate(' + 0 + ',' + (height + 40) + ')')
+        .call(legendXAxis);
+        
+         legend
+        .append('g')
+        .selectAll('rect')*/
+
+    /////
+  };
+});
